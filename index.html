@@ -196,6 +196,17 @@ canvas { display: block; margin: 0 auto; cursor: pointer; border-radius: 8px; }
   padding: 40px 20px; letter-spacing: 0.04em;
 }
 
+/* 月度统计 */
+.month-list { display: flex; gap: 8px; flex-wrap: wrap; }
+.month-tag {
+  background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 10px; padding: 6px 12px; font-size: 0.78rem; color: #ccc;
+  cursor: pointer; transition: all 0.2s; letter-spacing: 0.03em; white-space: nowrap;
+}
+.month-tag:hover { background: rgba(255,255,255,0.10); }
+.month-tag.active { background: rgba(100,180,246,0.2); border-color: rgba(100,180,246,0.35); color: #90caf9; }
+.month-tag .m-amount { font-weight: 600; color: #90caf9; }
+
 .footer-text { margin-top: 24px; font-size: 0.7rem; color: rgba(255,255,255,0.15); letter-spacing: 0.06em; }
 
 @media (max-width: 600px) {
@@ -237,6 +248,15 @@ canvas { display: block; margin: 0 auto; cursor: pointer; border-radius: 8px; }
     <div class="back-btn" id="backBtn">&larr; 返回总览</div>
     <canvas id="pieCanvas" width="600" height="340"></canvas>
     <div class="legend" id="legend"></div>
+  </div>
+
+  <!-- 月度统计 -->
+  <div class="glass-card month-summary" id="monthSummary" style="margin-bottom:20px;">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
+      <span style="font-size:0.85rem;color:var(--text-secondary);letter-spacing:0.04em;">月度总览</span>
+      <span style="font-size:1.1rem;font-weight:600;" id="currentMonthTotal">¥0.00</span>
+    </div>
+    <div class="month-list" id="monthList"></div>
   </div>
 
   <!-- 表单 -->
@@ -528,7 +548,7 @@ async function addExpense() {
   }
 
   amountInput.value=''; noteInput.value=''; subInput.value='';
-  render(); renderExpenseList();
+  render(); renderMonthlySummary(); renderExpenseList();
 }
 
 $('submitBtn').addEventListener('click', addExpense);
@@ -542,7 +562,7 @@ async function deleteExpense(id) {
   if (chartMode==='drilldown') {
     if (!expenses.some(e=>e.category===drillCategory)) { chartMode='overview'; drillCategory=null; }
   }
-  render(); renderExpenseList();
+  render(); renderMonthlySummary(); renderExpenseList();
 }
 
 function renderExpenseList() {
@@ -571,12 +591,38 @@ function renderExpenseList() {
 function fmt(n) { return String(n).padStart(2,'0'); }
 function escHtml(s) { const d=document.createElement('div'); d.textContent=s; return d.innerHTML; }
 
+function renderMonthlySummary() {
+  const months = {};
+  expenses.forEach(e => {
+    const d = new Date(e.date);
+    const key = d.getFullYear() + '-' + fmt(d.getMonth() + 1);
+    months[key] = (months[key] || 0) + e.amount;
+  });
+
+  const monthKeys = Object.keys(months).sort().reverse();
+  const now = new Date();
+  const curKey = now.getFullYear() + '-' + fmt(now.getMonth() + 1);
+
+  // 当前月总计
+  const curTotal = months[curKey] || 0;
+  $('currentMonthTotal').textContent = '¥' + curTotal.toFixed(2);
+
+  // 月份标签
+  $('monthList').innerHTML = monthKeys.map(k => {
+    const [y, m] = k.split('-');
+    const label = y.slice(2) + '年' + m + '月';
+    const active = k === curKey ? ' active' : '';
+    return `<span class="month-tag${active}" data-month="${k}">${label} <span class="m-amount">¥${months[k].toFixed(0)}</span></span>`;
+  }).join('');
+}
+
 async function refreshAll() {
   $('deviceIdDisplay').textContent = deviceId;
   await loadExpenses();
   await loadSubs();
   updateSubUI();
   render();
+  renderMonthlySummary();
   renderExpenseList();
 }
 
@@ -598,6 +644,7 @@ async function init() {
   await loadSubs();
   updateSubUI();
   render();
+  renderMonthlySummary();
   renderExpenseList();
 }
 init();
