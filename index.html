@@ -82,6 +82,17 @@ body::after {
   font-family: inherit; cursor: pointer; letter-spacing: 0.04em; transition: all 0.2s;
 }
 .sync-btn:hover { background: rgba(100,180,246,0.3); }
+.install-btn {
+  background: rgba(0,212,136,0.2); border: 1px solid rgba(0,212,136,0.35);
+  color: #00d488; padding: 4px 14px; border-radius: 8px; font-size: 0.8rem;
+  font-family: inherit; cursor: pointer; letter-spacing: 0.04em; transition: all 0.2s;
+  animation: installGlow 2s ease-in-out infinite;
+}
+.install-btn:hover { background: rgba(0,212,136,0.35); transform: scale(1.05); }
+@keyframes installGlow {
+  0%,100%{box-shadow:0 0 8px rgba(0,212,136,0.15)}
+  50%{box-shadow:0 0 18px rgba(0,212,136,0.35)}
+}
 .sync-btn-cancel {
   background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1);
   color: #999; padding: 4px 14px; border-radius: 8px; font-size: 0.8rem;
@@ -213,6 +224,7 @@ canvas { display: block; margin: 0 auto; cursor: pointer; border-radius: 8px; }
     <span class="sync-label">房间码</span>
     <span class="sync-code" id="deviceIdDisplay">----</span>
     <button class="sync-btn" id="showPairBtn">配对</button>
+    <button class="install-btn" id="installBtn" style="display:none;">安装应用</button>
   </div>
   <div class="pair-box" id="pairBox" style="display:none;">
     <input type="text" id="pairInput" class="pair-input" placeholder="输入对方的房间码" maxlength="6" autocomplete="off">
@@ -594,6 +606,22 @@ init();
 if ('serviceWorker' in navigator) {
   navigator.serviceWorker.register('sw.js');
 }
+
+// 手动安装应用
+let installPrompt = null;
+window.addEventListener('beforeinstallprompt', (e) => {
+  e.preventDefault();
+  installPrompt = e;
+  $('installBtn').style.display = 'inline-block';
+});
+$('installBtn').addEventListener('click', () => {
+  if (!installPrompt) return;
+  installPrompt.prompt();
+  installPrompt.userChoice.then(() => {
+    installPrompt = null;
+    $('installBtn').style.display = 'none';
+  });
+});
 </script>
 </body>
 </html>
