@@ -529,7 +529,7 @@ async function addExpense() {
   const sub = subInput.value.trim();
   if (!sub) return alert('请输入子分类');
   const amount = parseFloat(amountInput.value);
-  if (isNaN(amount)||amount<=0) return alert('请输入有效金额');
+  if (isNaN(amount)||amount<0.01) return alert('金额最小为0.01');
 
   const exp = {
     id: Date.now().toString(36)+Math.random().toString(36).slice(2,6),
