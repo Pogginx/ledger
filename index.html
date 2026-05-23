@@ -517,11 +517,16 @@ function updateSubUI() {
   if (!cat) { subInput.style.display='none'; return; }
   subInput.style.display='inline-block';
   subInput.placeholder = '输入子分类';
+  // 只允许输入中文
+  subInput.value = subInput.value.replace(/[^一-鿿]/g, '');
   subDatalist.innerHTML = getAllSubs(cat).map(s => `<option value="${s}">`).join('');
   subInput.setAttribute('list','subDatalist');
   subInput.value = '';
 }
 catSel.addEventListener('change', updateSubUI);
+subInput.addEventListener('input', () => {
+  subInput.value = subInput.value.replace(/[^一-鿿]/g, '');
+});
 
 async function addExpense() {
   const cat = catSel.value;
