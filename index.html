@@ -346,17 +346,23 @@ async function loadSubs() {
   const { data, error } = await sb.from('ledger_subs').select('*').eq('device_id', deviceId);
   if (error) { console.error('加载子分类失败:', error); return; }
   customSubsCache = {};
-  data.forEach(r => {
-    if (!customSubsCache[r.category]) customSubsCache[r.category] = [];
-    customSubsCache[r.category].push(r.sub_name);
-  });
+  if (data) {
+    data.forEach(r => {
+      if (!customSubsCache[r.category]) customSubsCache[r.category] = [];
+      customSubsCache[r.category].push(r.sub_name);
+    });
+  }
 }
 
 async function saveSub(cat, subName) {
-  const { error } = await sb.from('ledger_subs').upsert({
-    device_id: deviceId, category: cat, sub_name: subName
-  }, { onConflict: 'device_id,category,sub_name' });
-  if (error) console.error('保存子分类失败:', error);
+  const { data: exist } = await sb.from('ledger_subs')
+    .select('*').eq('device_id', deviceId).eq('category', cat).eq('sub_name', subName);
+  if (!exist || exist.length === 0) {
+    const { error } = await sb.from('ledger_subs').insert({
+      device_id: deviceId, category: cat, sub_name: subName
+    });
+    if (error) console.error('保存子分类失败:', error);
+  }
 }
 
 function getAllSubs(cat) { return customSubsCache[cat] || []; }
