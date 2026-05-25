@@ -551,13 +551,6 @@ async function addExpense() {
   expenses.unshift(exp);
   await addExpenseToCloud(exp);
 
-  if (!getAllSubs(cat).includes(sub)) {
-    if (!customSubsCache[cat]) customSubsCache[cat] = [];
-    customSubsCache[cat].push(sub);
-    await saveSub(cat, sub);
-    updateSubUI();
-  }
-
   amountInput.value=''; noteInput.value=''; subInput.value='';
   render(); renderMonthlySummary(); renderExpenseList();
 }
