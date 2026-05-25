@@ -269,7 +269,7 @@ canvas { display: block; margin: 0 auto; cursor: pointer; border-radius: 8px; }
         <option value="零食">零食</option>
         <option value="网购">网购</option>
       </select>
-      <input type="text" id="subInput" class="note-input" placeholder="输入或选择子分类" style="display:none;">
+      <input type="text" id="subInput" class="note-input" placeholder="输入或选择子分类" style="display:none;" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
       <input type="number" id="amountInput" class="amount-input" placeholder="金额" step="0.01" min="0.01">
       <input type="text" id="noteInput" class="note-input" placeholder="备注 (可选)">
       <button class="submit-btn" id="submitBtn">记一笔</button>
@@ -523,10 +523,8 @@ function updateSubUI() {
   if (!cat) { subInput.style.display='none'; return; }
   subInput.style.display='inline-block';
   subInput.placeholder = '输入子分类';
-  // 只允许输入中文
-  subInput.value = subInput.value.replace(/[^一-鿿]/g, '');
-  subDatalist.innerHTML = getAllSubs(cat).map(s => `<option value="${s}">`).join('');
-  subInput.setAttribute('list','subDatalist');
+  subInput.removeAttribute('list');
+  subInput.name = 'sub_' + Date.now();
   subInput.value = '';
 }
 catSel.addEventListener('change', updateSubUI);
