@@ -266,6 +266,15 @@ canvas { display: block; margin: 0 auto; cursor: pointer; border-radius: 12px; }
 .btn-cancel { color: rgba(255,255,255,0.35); }
 .btn-cancel:hover { background: rgba(255,255,255,0.08); color: rgba(255,255,255,0.6); }
 
+/* 列表筛选按钮 */
+.filter-btn {
+  background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.06);
+  color: #999; padding: 5px 16px; border-radius: 12px; font-size: 0.78rem;
+  font-family: inherit; cursor: pointer; letter-spacing: 0.05em; transition: all 0.2s;
+}
+.filter-btn:hover { color: #ccc; border-color: rgba(255,255,255,0.14); }
+.filter-btn.active { background: rgba(100,180,246,0.15); border-color: rgba(100,180,246,0.3); color: #90caf9; }
+
 .empty-state {
   color: var(--text-secondary); font-size: 0.88rem;
   padding: 48px 20px; letter-spacing: 0.05em; line-height: 1.8;
@@ -333,6 +342,13 @@ canvas { display: block; margin: 0 auto; cursor: pointer; border-radius: 12px; }
     <div class="legend" id="legend"></div>
   </div>
 
+  <!-- 今日支出 -->
+  <div class="glass-card" style="margin-bottom:22px;text-align:center;">
+    <div style="font-size:0.85rem;color:var(--text-secondary);letter-spacing:0.04em;margin-bottom:6px;">今日支出 <span id="todayTotal" style="color:#90caf9;font-weight:600;">¥0.00</span></div>
+    <canvas id="todayCanvas" width="240" height="240" style="display:block;margin:0 auto;"></canvas>
+    <div class="legend" id="todayLegend" style="margin-top:8px;"></div>
+  </div>
+
   <!-- 月度统计 -->
   <div class="glass-card month-summary" id="monthSummary" style="margin-bottom:20px;">
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
@@ -362,6 +378,10 @@ canvas { display: block; margin: 0 auto; cursor: pointer; border-radius: 12px; }
 
   <!-- 支出列表 -->
   <div class="glass-card">
+    <div style="display:flex;gap:6px;margin-bottom:12px;">
+      <button class="filter-btn active" id="filterToday">今日</button>
+      <button class="filter-btn" id="filterAll">全部</button>
+    </div>
     <div class="expense-list" id="expenseList">
       <div class="empty-state" id="emptyState">还没有记录<br>开始记第一笔吧</div>
     </div>
@@ -526,6 +546,19 @@ function getDrilldownSegments() {
   return subs.map(([sub, val], i) => ({ label: sub, value: val, color: colors[i], cat: drillCategory, sub }));
 }
 
+function getTodaySegments() {
+  const today = new Date();
+  const y = today.getFullYear(), m = today.getMonth(), d = today.getDate();
+  const todayExpenses = expenses.filter(e => {
+    const ed = new Date(e.date);
+    return ed.getFullYear() === y && ed.getMonth() === m && ed.getDate() === d;
+  });
+  const totals = {};
+  CATS.forEach(c => totals[c] = 0);
+  todayExpenses.forEach(e => { totals[e.category] = (totals[e.category] || 0) + e.amount; });
+  return CATS.map(c => ({ label: c, value: totals[c] || 0, color: CAT_CFG[c].color, cat: c })).filter(s => s.value > 0);
+}
+
 function getSegments() { return chartMode === 'overview' ? getOverviewSegments() : getDrilldownSegments(); }
 
 function drawPie(segments) {
@@ -572,9 +605,61 @@ function drawSliceLabels(segments, total) {
   });
 }
 
+function drawTodayPie() {
+  const canvas = $('todayCanvas');
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+  const W = canvas.width, H = canvas.height;
+  const cx = W/2, cy = H/2, R = 90, innerR = 35;
+  ctx.clearRect(0, 0, W, H);
+
+  const segs = getTodaySegments();
+  const total = segs.reduce((s,x) => s + x.value, 0);
+
+  if (total === 0 || segs.length === 0) {
+    ctx.beginPath(); ctx.arc(cx, cy, R, 0, Math.PI*2); ctx.fillStyle = 'rgba(255,255,255,0.03)'; ctx.fill();
+    ctx.beginPath(); ctx.arc(cx, cy, innerR, 0, Math.PI*2); ctx.fillStyle = 'rgba(20,20,40,0.8)'; ctx.fill();
+    ctx.fillStyle = '#666'; ctx.font = '12px "Microsoft YaHei","PingFang SC",sans-serif'; ctx.textAlign = 'center'; ctx.fillText('暂无', cx, cy + 4);
+  } else {
+    let angle = -Math.PI/2;
+    segs.forEach(seg => {
+      const sa = (seg.value/total)*Math.PI*2;
+      ctx.beginPath(); ctx.moveTo(cx,cy); ctx.arc(cx,cy,R,angle,angle+sa); ctx.closePath();
+      ctx.fillStyle = seg.color; ctx.fill();
+      ctx.strokeStyle = 'rgba(20,20,40,0.5)'; ctx.lineWidth = 1.5; ctx.stroke();
+      seg._sa = angle; seg._ea = angle + sa; angle += sa;
+    });
+    ctx.beginPath(); ctx.arc(cx,cy,innerR,0,Math.PI*2); ctx.fillStyle = 'rgba(20,20,40,0.9)'; ctx.fill();
+    ctx.fillStyle = '#e0e0e0'; ctx.font = 'bold 14px "Microsoft YaHei","PingFang SC",sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText('¥'+total.toFixed(0), cx, cy);
+
+    // 标签
+    segs.forEach(seg => {
+      const pct = seg.value/total;
+      if (pct < 0.08) return;
+      const ma = (seg._sa + seg._ea)/2;
+      ctx.fillStyle = '#fff'; ctx.font = 'bold 11px "Microsoft YaHei","PingFang SC",sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.shadowColor = 'rgba(0,0,0,0.6)'; ctx.shadowBlur = 2;
+      ctx.fillText(seg.label, cx + Math.cos(ma)*R*0.65, cy + Math.sin(ma)*R*0.65);
+      ctx.shadowBlur = 0;
+      ctx.fillStyle = 'rgba(255,255,255,0.7)'; ctx.font = '10px "Microsoft YaHei","PingFang SC",sans-serif';
+      ctx.fillText(Math.round(pct*100)+'%', cx + Math.cos(ma)*R*0.65, cy + Math.sin(ma)*R*0.65 + 14);
+    });
+  }
+
+  $('todayTotal').textContent = '¥' + total.toFixed(2);
+  // 今日图例
+  const leg = $('todayLegend');
+  leg.innerHTML = segs.map(s => {
+    const pct = total > 0 ? Math.round((s.value/total)*100) : 0;
+    return `<span class="legend-item"><span class="legend-dot" style="background:${s.color}"></span>${s.label} ${pct}%</span>`;
+  }).join('');
+}
+
 function render() {
   currentSegments = getSegments();
   drawPie(currentSegments);
+  drawTodayPie();
   renderLegend(currentSegments);
   $('backBtn').className = chartMode === 'drilldown' ? 'back-btn visible' : 'back-btn';
 }
@@ -657,13 +742,29 @@ async function deleteExpense(id) {
   render(); renderMonthlySummary(); renderTrend(); renderExpenseList();
 }
 
+let listFilter = 'today'; // 'today' | 'all'
+
 function renderExpenseList() {
   const list = $('expenseList'), empty = $('emptyState');
   list.innerHTML=''; list.appendChild(empty);
-  if (expenses.length===0) { empty.style.display='block'; return; }
+
+  let filtered = expenses;
+  if (listFilter === 'today') {
+    const now = new Date();
+    filtered = expenses.filter(e => {
+      const d = new Date(e.date);
+      return d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth() && d.getDate() === now.getDate();
+    });
+  }
+
+  if (filtered.length===0) {
+    empty.style.display='block';
+    empty.textContent = listFilter === 'today' ? '今天还没有记录' : '还没有记录\n开始记第一笔吧';
+    return;
+  }
   empty.style.display='none';
   const frag = document.createDocumentFragment();
-  expenses.forEach(e => {
+  filtered.forEach(e => {
     const d = new Date(e.date);
     const catColor = CAT_CFG[e.category]?.color || '#888';
     const div = document.createElement('div'); div.className='expense-item';
@@ -900,6 +1001,18 @@ $('doPairBtn').addEventListener('click', () => {
   switchDeviceId(code);
   $('pairBox').style.display='none'; $('syncBar').style.display='inline-flex'; $('pairInput').value='';
   alert('已切换到房间 ' + code + '，数据已同步！');
+});
+
+// 列表筛选
+$('filterToday').addEventListener('click', () => {
+  listFilter = 'today';
+  $('filterToday').classList.add('active'); $('filterAll').classList.remove('active');
+  renderExpenseList();
+});
+$('filterAll').addEventListener('click', () => {
+  listFilter = 'all';
+  $('filterAll').classList.add('active'); $('filterToday').classList.remove('active');
+  renderExpenseList();
 });
 
 async function init() {
