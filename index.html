@@ -229,6 +229,42 @@ canvas { display: block; margin: 0 auto; cursor: pointer; border-radius: 12px; }
 }
 .expense-item:hover .btn-del { opacity: 1; }
 .expense-item .btn-del:hover { color: #ff6b6b; background: rgba(255,80,80,0.2); }
+.expense-item .btn-edit {
+  background: none; border: none; color: rgba(255,255,255,0.1); cursor: pointer;
+  font-size: 0.9rem; padding: 4px 8px; border-radius: 8px; transition: all 0.2s; font-family: inherit;
+  opacity: 0; flex-shrink: 0;
+}
+.expense-item:hover .btn-edit { opacity: 1; }
+.expense-item .btn-edit:hover { color: #64b5f6; background: rgba(100,180,246,0.2); }
+.expense-item.editing { background: rgba(100,180,246,0.06); border-color: rgba(100,180,246,0.15); }
+.expense-item.editing .btn-edit,
+.expense-item.editing .btn-del { display: none; }
+.edit-input {
+  background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.10);
+  color: #e0e0e0; padding: 5px 8px; border-radius: 8px; font-size: 0.82rem;
+  font-family: inherit; outline: none; transition: all 0.2s;
+}
+.edit-input:focus { border-color: rgba(100,180,246,0.45); background: rgba(255,255,255,0.10); }
+.edit-input.amount-edit { width: 85px; text-align: right; font-variant-numeric: tabular-nums; font-weight: 600; }
+.edit-input.sub-edit { width: 80px; }
+.edit-input.note-edit { max-width: 80px; }
+.edit-select {
+  background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.10);
+  color: #e0e0e0; padding: 5px 8px; border-radius: 8px; font-size: 0.8rem;
+  font-family: inherit; outline: none; cursor: pointer; color-scheme: dark;
+  appearance: none; -webkit-appearance: none;
+}
+.edit-select:focus { border-color: rgba(100,180,246,0.45); }
+.edit-select option { background: #14142a; color: #e0e0e0; }
+.edit-actions { display: flex; gap: 4px; flex-shrink: 0; }
+.btn-save, .btn-cancel {
+  background: none; border: none; cursor: pointer; font-size: 0.82rem;
+  padding: 4px 8px; border-radius: 8px; font-family: inherit; transition: all 0.2s;
+}
+.btn-save { color: #4db6ac; }
+.btn-save:hover { background: rgba(77,182,172,0.2); }
+.btn-cancel { color: rgba(255,255,255,0.35); }
+.btn-cancel:hover { background: rgba(255,255,255,0.08); color: rgba(255,255,255,0.6); }
 
 .empty-state {
   color: var(--text-secondary); font-size: 0.88rem;
@@ -261,6 +297,7 @@ canvas { display: block; margin: 0 auto; cursor: pointer; border-radius: 12px; }
   .glass-card { padding: 16px; border-radius: 16px; }
   .expense-item { padding: 10px 12px; }
   .expense-item .btn-del { opacity: 1; }
+  .expense-item .btn-edit { opacity: 1; }
 }
 </style>
 </head>
@@ -387,6 +424,12 @@ async function addExpenseToCloud(exp) {
 async function deleteExpenseFromCloud(id) {
   const { error } = await sb.from('ledger_expenses').delete().eq('id', id);
   if (error) console.error('删除失败:', error);
+}
+
+async function updateExpenseInCloud(id, updates) {
+  const { error } = await sb.from('ledger_expenses').update(updates).eq('id', id);
+  if (error) console.error('更新失败:', error);
+  return !error;
 }
 
 async function loadSubs() {
@@ -631,11 +674,92 @@ function renderExpenseList() {
       <span class="sub">${e.subCategory}</span>
       ${e.note?`<span class="note-text">${escHtml(e.note)}</span>`:''}
       <span class="amount" style="color:${catColor}">¥${e.amount.toFixed(2)}</span>
-      <button class="btn-del" data-id="${e.id}">✕</button>`;
+      <button class="btn-edit" data-id="${e.id}" title="修改">✎</button>
+      <button class="btn-del" data-id="${e.id}" title="删除">✕</button>`;
     frag.appendChild(div);
   });
   list.insertBefore(frag, empty);
-  list.querySelectorAll('.btn-del').forEach(b => { b.addEventListener('click', ()=>deleteExpense(b.dataset.id)); });
+
+  list.querySelectorAll('.btn-del').forEach(b => {
+    b.addEventListener('click', () => deleteExpense(b.dataset.id));
+  });
+  list.querySelectorAll('.btn-edit').forEach(b => {
+    b.addEventListener('click', () => enterEditMode(b.dataset.id));
+  });
+}
+
+function enterEditMode(id) {
+  const exp = expenses.find(e => e.id === id);
+  if (!exp) return;
+  const item = document.querySelector(`.btn-edit[data-id="${id}"],.btn-del[data-id="${id}"]`).closest('.expense-item');
+  const catColor = CAT_CFG[exp.category]?.color || '#888';
+  item.classList.add('editing');
+  item.style.setProperty('--item-color', catColor);
+  const d = new Date(exp.date);
+
+  item.innerHTML = `
+    <span class="date">${fmt(d.getMonth()+1)}-${fmt(d.getDate())}</span>
+    <select class="edit-select cat-edit">
+      ${CATS.map(c => `<option value="${c}" ${c===exp.category?'selected':''}>${c}</option>`).join('')}
+    </select>
+    <input class="edit-input sub-edit" value="${escHtml(exp.subCategory)}" placeholder="子分类" autocomplete="off">
+    <input class="edit-input amount-edit" type="number" value="${exp.amount}" step="0.01" min="0.01" style="color:${catColor}">
+    <input class="edit-input note-edit" value="${escHtml(exp.note)}" placeholder="备注">
+    <div class="edit-actions">
+      <button class="btn-save">保存</button>
+      <button class="btn-cancel">取消</button>
+    </div>`;
+
+  const catSelect = item.querySelector('.cat-edit');
+  catSelect.addEventListener('change', () => {
+    const newColor = CAT_CFG[catSelect.value]?.color || '#888';
+    item.style.setProperty('--item-color', newColor);
+    item.querySelector('.amount-edit').style.color = newColor;
+  });
+
+  item.querySelector('.btn-save').addEventListener('click', () => saveEdit(id, item));
+  item.querySelector('.btn-cancel').addEventListener('click', () => { renderExpenseList(); });
+  item.querySelector('.sub-edit').addEventListener('keydown', e => { if (e.key==='Enter') saveEdit(id, item); });
+  item.querySelector('.amount-edit').addEventListener('keydown', e => { if (e.key==='Enter') saveEdit(id, item); });
+  item.querySelector('.note-edit').addEventListener('keydown', e => { if (e.key==='Enter') saveEdit(id, item); });
+
+  // focus amount for quick correction
+  setTimeout(() => item.querySelector('.amount-edit').focus(), 50);
+}
+
+async function saveEdit(id, item) {
+  const cat = item.querySelector('.cat-edit').value;
+  const sub = item.querySelector('.sub-edit').value.trim();
+  const amount = parseFloat(item.querySelector('.amount-edit').value);
+  const note = item.querySelector('.note-edit').value.trim();
+
+  if (!cat) return alert('请选择分类');
+  if (!sub) return alert('请输入子分类');
+  if (isNaN(amount) || amount < 0.01) return alert('金额最小为0.01');
+
+  const idx = expenses.findIndex(e => e.id === id);
+  if (idx === -1) return;
+  expenses[idx].category = cat;
+  expenses[idx].subCategory = sub;
+  expenses[idx].amount = Math.round(amount * 100) / 100;
+  expenses[idx].note = note;
+
+  await updateExpenseInCloud(id, {
+    category: cat,
+    sub_category: sub,
+    amount: expenses[idx].amount,
+    note: note
+  });
+  if (sub) await saveSub(cat, sub);
+
+  if (chartMode === 'drilldown' && cat !== drillCategory) {
+    if (!expenses.some(e => e.category === drillCategory)) {
+      chartMode = 'overview';
+      drillCategory = null;
+    }
+  }
+
+  render(); renderMonthlySummary(); renderTrend(); renderExpenseList();
 }
 
 function fmt(n) { return String(n).padStart(2,'0'); }
