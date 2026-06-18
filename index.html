@@ -631,7 +631,7 @@ function drawTodayPie() {
     });
     ctx.beginPath(); ctx.arc(cx,cy,innerR,0,Math.PI*2); ctx.fillStyle = 'rgba(20,20,40,0.9)'; ctx.fill();
     ctx.fillStyle = '#e0e0e0'; ctx.font = 'bold 14px "Microsoft YaHei","PingFang SC",sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-    ctx.fillText('¥'+total.toFixed(0), cx, cy);
+    ctx.fillText('¥'+total.toFixed(2), cx, cy);
 
     // 标签
     segs.forEach(seg => {
