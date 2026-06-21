@@ -248,6 +248,19 @@ canvas { display: block; margin: 0 auto; cursor: pointer; border-radius: 12px; }
 .edit-input.amount-edit { width: 85px; text-align: right; font-variant-numeric: tabular-nums; font-weight: 600; }
 .edit-input.sub-edit { width: 80px; }
 .edit-input.note-edit { max-width: 80px; }
+
+/* 子分类建议标签 */
+.sub-suggestions {
+  display: none; flex-wrap: wrap; gap: 6px; margin-top: 8px; padding-top: 4px;
+}
+.sub-tag {
+  display: inline-block; background: rgba(255,255,255,0.06);
+  border: 1px solid rgba(255,255,255,0.10); border-radius: 12px;
+  padding: 4px 12px; font-size: 0.76rem; color: #bbb;
+  cursor: pointer; transition: all 0.2s; letter-spacing: 0.04em;
+}
+.sub-tag:hover { background: rgba(100,180,246,0.18); border-color: rgba(100,180,246,0.35); color: #90caf9; }
+
 .edit-select {
   background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.10);
   color: #e0e0e0; padding: 5px 8px; border-radius: 8px; font-size: 0.8rem;
@@ -471,7 +484,7 @@ async function saveSub(cat, subName) {
   if (!customSubsCache[cat]) customSubsCache[cat] = [];
   if (!customSubsCache[cat].includes(subName)) {
     customSubsCache[cat].push(subName);
-    updateSubDatalist(cat);
+    renderSubSuggestions(cat);
   }
   // 再异步写入 Supabase
   const { data: exist } = await sb.from('ledger_subs')
@@ -482,12 +495,6 @@ async function saveSub(cat, subName) {
     });
     if (error) console.error('保存子分类失败:', error);
   }
-}
-
-function updateSubDatalist(cat) {
-  if (catSel.value !== cat) return;
-  const subs = getAllSubs(cat);
-  subDatalist.innerHTML = subs.map(s => '<option value="' + escHtml(s) + '">').join('');
 }
 
 function getAllSubs(cat) { return customSubsCache[cat] || []; }
@@ -705,18 +712,40 @@ function renderLegend(segments) {
 
 // ===== 表单 =====
 const catSel = $('catSelect'), subInput = $('subInput'), amountInput = $('amountInput'), noteInput = $('noteInput');
-let subDatalist = document.getElementById('subDatalist');
-if (!subDatalist) { subDatalist = document.createElement('datalist'); subDatalist.id='subDatalist'; document.body.appendChild(subDatalist); }
+const subSuggestions = document.createElement('div');
+subSuggestions.className = 'sub-suggestions';
+subSuggestions.id = 'subSuggestions';
+subInput.parentNode.insertBefore(subSuggestions, subInput.nextSibling);
 
 function updateSubUI() {
   const cat = catSel.value;
-  if (!cat) { subInput.style.display='none'; return; }
+  if (!cat) { subInput.style.display='none'; subSuggestions.style.display='none'; return; }
   subInput.style.display='inline-block';
   subInput.placeholder = '输入子分类';
-  subInput.setAttribute('list', 'subDatalist');
-  updateSubDatalist(cat);
+  subInput.autocomplete = 'off';
+  renderSubSuggestions(cat);
 }
 catSel.addEventListener('change', updateSubUI);
+
+function renderSubSuggestions(cat) {
+  const subs = getAllSubs(cat);
+  if (subs.length === 0) { subSuggestions.style.display='none'; return; }
+  subSuggestions.style.display = 'flex';
+  subSuggestions.innerHTML = subs.map(s =>
+    '<span class="sub-tag" data-sub="' + escHtml(s) + '">' + escHtml(s) + '</span>'
+  ).join('');
+  subSuggestions.querySelectorAll('.sub-tag').forEach(tag => {
+    tag.addEventListener('click', () => {
+      subInput.value = tag.dataset.sub;
+      subInput.focus();
+    });
+  });
+}
+
+// 子分类只允许中文
+subInput.addEventListener('input', () => {
+  subInput.value = subInput.value.replace(/[^一-鿿]/g, '');
+});
 
 async function addExpense() {
   const cat = catSel.value;
