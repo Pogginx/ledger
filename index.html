@@ -518,6 +518,7 @@ const cx = 170, cy = 170, R = 130, innerR = 50;
 
 let chartMode = 'overview';
 let drillCategory = null;
+let drillMonth = null;
 let currentSegments = [];
 
 function genSubColors(base, count) {
@@ -542,7 +543,14 @@ function getOverviewSegments() {
 
 function getDrilldownSegments() {
   const map = {};
-  expenses.filter(e => e.category === drillCategory).forEach(e => { map[e.subCategory] = (map[e.subCategory] || 0) + e.amount; });
+  expenses.filter(e => {
+    if (e.category !== drillCategory) return false;
+    if (drillMonth) {
+      const d = new Date(e.date);
+      return (d.getFullYear() + '-' + fmt(d.getMonth() + 1)) === drillMonth;
+    }
+    return true;
+  }).forEach(e => { map[e.subCategory] = (map[e.subCategory] || 0) + e.amount; });
   const subs = Object.entries(map).sort((a,b) => b[1] - a[1]);
   const colors = genSubColors(CAT_CFG[drillCategory].color, subs.length);
   return subs.map(([sub, val], i) => ({ label: sub, value: val, color: colors[i], cat: drillCategory, sub }));
@@ -670,7 +678,7 @@ canvas.addEventListener('click', (e) => {
   const rect = canvas.getBoundingClientRect();
   const mx = (e.clientX-rect.left)*(W/rect.width), my = (e.clientY-rect.top)*(H/rect.height);
   const dx = mx-cx, dy = my-cy, dist = Math.sqrt(dx*dx+dy*dy);
-  if (dist < innerR) { if (chartMode==='drilldown'){chartMode='overview';drillCategory=null;render();} return; }
+  if (dist < innerR) { if (chartMode==='drilldown'){chartMode='overview';drillCategory=null;drillMonth=null;render();} return; }
   if (dist > R) return;
   let angle = Math.atan2(dy,dx); if (angle<-Math.PI/2) angle+=Math.PI*2;
   for (const seg of currentSegments) {
@@ -678,7 +686,7 @@ canvas.addEventListener('click', (e) => {
     while(sa<-Math.PI/2){sa+=Math.PI*2;ea+=Math.PI*2;}
     while(sa>=Math.PI*1.5){sa-=Math.PI*2;ea-=Math.PI*2;}
     let a=angle; while(a<sa)a+=Math.PI*2;
-    if(a>=sa && a<ea){ if(chartMode==='overview'){chartMode='drilldown';drillCategory=seg.cat;} render(); return; }
+    if(a>=sa && a<ea){ if(chartMode==='overview'){chartMode='drilldown';drillCategory=seg.cat;drillMonth=null;} render(); return; }
   }
 });
 
@@ -738,14 +746,14 @@ async function addExpense() {
 
 $('submitBtn').addEventListener('click', addExpense);
 document.addEventListener('keydown', e => { if (e.key==='Enter' && document.activeElement!==subInput) addExpense(); });
-$('backBtn').addEventListener('click', () => { if (chartMode==='drilldown'){chartMode='overview';drillCategory=null;render();} });
+$('backBtn').addEventListener('click', () => { if (chartMode==='drilldown'){chartMode='overview';drillCategory=null;drillMonth=null;render();} });
 
 // ===== 支出列表 =====
 async function deleteExpense(id) {
   expenses = expenses.filter(e => e.id !== id);
   await deleteExpenseFromCloud(id);
   if (chartMode==='drilldown') {
-    if (!expenses.some(e=>e.category===drillCategory)) { chartMode='overview'; drillCategory=null; }
+    if (!expenses.some(e=>e.category===drillCategory)) { chartMode='overview'; drillCategory=null; drillMonth=null; }
   }
   render(); renderMonthlySummary(); renderTrend(); renderExpenseList();
 }
@@ -865,6 +873,7 @@ async function saveEdit(id, item) {
     if (!expenses.some(e => e.category === drillCategory)) {
       chartMode = 'overview';
       drillCategory = null;
+      drillMonth = null;
     }
   }
 
@@ -977,6 +986,8 @@ function getMonthSegments(monthKey) {
   return CATS.map(c => ({ label: c, value: totals[c] || 0, color: CAT_CFG[c].color, cat: c })).filter(s => s.value > 0);
 }
 
+let monthlySegments = [];
+
 function drawMonthlyPie(monthKey) {
   const canvas = $('monthPieCanvas');
   const legend = $('monthPieLegend');
@@ -987,6 +998,7 @@ function drawMonthlyPie(monthKey) {
   ctx.clearRect(0, 0, W, H);
 
   const segs = getMonthSegments(monthKey);
+  monthlySegments = segs;
   const total = segs.reduce((s,x) => s + x.value, 0);
 
   if (total === 0 || segs.length === 0) {
@@ -1013,11 +1025,12 @@ function drawMonthlyPie(monthKey) {
     ctx.fillStyle = '#fff'; ctx.font = 'bold 10px "Microsoft YaHei","PingFang SC",sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
     ctx.shadowColor = 'rgba(0,0,0,0.6)'; ctx.shadowBlur = 2;
     ctx.fillText(seg.label, cx + Math.cos(ma)*R*0.65, cy + Math.sin(ma)*R*0.65);
-    ctx.shadowBlur = 0;
+    ctx.shadowColor = 'transparent'; ctx.shadowBlur = 0;
     ctx.fillStyle = 'rgba(255,255,255,0.7)'; ctx.font = '9px "Microsoft YaHei","PingFang SC",sans-serif';
     ctx.fillText(Math.round(pct*100)+'%', cx + Math.cos(ma)*R*0.65, cy + Math.sin(ma)*R*0.65 + 13);
   });
   ctx.beginPath(); ctx.arc(cx,cy,innerR,0,Math.PI*2); ctx.fillStyle = 'rgba(20,20,40,0.9)'; ctx.fill();
+  ctx.shadowColor = 'transparent'; ctx.shadowBlur = 0;
   ctx.fillStyle = '#e0e0e0'; ctx.font = 'bold 14px "Microsoft YaHei","PingFang SC",sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
   ctx.fillText('¥'+total.toFixed(2), cx, cy);
 
@@ -1025,6 +1038,29 @@ function drawMonthlyPie(monthKey) {
     const pct = total > 0 ? Math.round((s.value/total)*100) : 0;
     return '<span class="legend-item"><span class="legend-dot" style="background:'+s.color+'"></span>'+s.label+' '+pct+'%</span>';
   }).join('');
+
+  // 月度饼图点击：联动主饼图下钻
+  canvas.onclick = function(e) {
+    const rect = canvas.getBoundingClientRect();
+    const mx = (e.clientX-rect.left)*(W/rect.width), my = (e.clientY-rect.top)*(H/rect.height);
+    const dx = mx-cx, dy = my-cy, dist = Math.sqrt(dx*dx+dy*dy);
+    if (dist < innerR || dist > R) return;
+    let a = Math.atan2(dy,dx); if (a < -Math.PI/2) a += Math.PI*2;
+    for (const seg of monthlySegments) {
+      let sa = seg._sa, ea = seg._ea;
+      while (sa < -Math.PI/2) { sa += Math.PI*2; ea += Math.PI*2; }
+      while (sa >= Math.PI*1.5) { sa -= Math.PI*2; ea -= Math.PI*2; }
+      let ta = a; while (ta < sa) ta += Math.PI*2;
+      if (ta >= sa && ta < ea) {
+        chartMode = 'drilldown';
+        drillCategory = seg.cat;
+        drillMonth = selectedMonth;
+        render();
+        window.scrollTo({top: 0, behavior: 'smooth'});
+        return;
+      }
+    }
+  };
 }
 
 function renderMonthlySummary() {
