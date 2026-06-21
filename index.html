@@ -356,6 +356,8 @@ canvas { display: block; margin: 0 auto; cursor: pointer; border-radius: 12px; }
       <span style="font-size:1.1rem;font-weight:600;" id="currentMonthTotal">¥0.00</span>
     </div>
     <div class="month-list" id="monthList"></div>
+    <canvas id="monthPieCanvas" width="240" height="240" style="display:block;margin:12px auto 0;"></canvas>
+    <div class="legend" id="monthPieLegend" style="margin-top:6px;"></div>
     <canvas id="trendCanvas" width="600" height="160" style="margin-top:12px;display:block;width:100%;height:auto;border-radius:10px;"></canvas>
   </div>
 
@@ -963,6 +965,56 @@ function renderTrend() {
   });
 }
 
+let selectedMonth = null;
+
+function getMonthSegments(monthKey) {
+  const totals = {};
+  CATS.forEach(c => totals[c] = 0);
+  expenses.filter(e => {
+    const d = new Date(e.date);
+    return (d.getFullYear() + '-' + fmt(d.getMonth() + 1)) === monthKey;
+  }).forEach(e => { totals[e.category] = (totals[e.category] || 0) + e.amount; });
+  return CATS.map(c => ({ label: c, value: totals[c] || 0, color: CAT_CFG[c].color, cat: c })).filter(s => s.value > 0);
+}
+
+function drawMonthlyPie(monthKey) {
+  const canvas = $('monthPieCanvas');
+  const legend = $('monthPieLegend');
+  if (!canvas || !legend) return;
+  const ctx = canvas.getContext('2d');
+  const W = canvas.width, H = canvas.height;
+  const cx = W/2, cy = H/2, R = 95, innerR = 40;
+  ctx.clearRect(0, 0, W, H);
+
+  const segs = getMonthSegments(monthKey);
+  const total = segs.reduce((s,x) => s + x.value, 0);
+
+  if (total === 0 || segs.length === 0) {
+    ctx.beginPath(); ctx.arc(cx, cy, R, 0, Math.PI*2); ctx.fillStyle = 'rgba(255,255,255,0.03)'; ctx.fill();
+    ctx.beginPath(); ctx.arc(cx, cy, innerR, 0, Math.PI*2); ctx.fillStyle = 'rgba(20,20,40,0.8)'; ctx.fill();
+    ctx.fillStyle = '#666'; ctx.font = '12px "Microsoft YaHei","PingFang SC",sans-serif'; ctx.textAlign = 'center'; ctx.fillText('该月无数据', cx, cy+4);
+    legend.innerHTML = '';
+    return;
+  }
+
+  let angle = -Math.PI/2;
+  segs.forEach(seg => {
+    const sa = (seg.value/total)*Math.PI*2;
+    ctx.beginPath(); ctx.moveTo(cx,cy); ctx.arc(cx,cy,R,angle,angle+sa); ctx.closePath();
+    ctx.fillStyle = seg.color; ctx.fill();
+    ctx.strokeStyle = 'rgba(20,20,40,0.5)'; ctx.lineWidth = 1.5; ctx.stroke();
+    angle += sa;
+  });
+  ctx.beginPath(); ctx.arc(cx,cy,innerR,0,Math.PI*2); ctx.fillStyle = 'rgba(20,20,40,0.9)'; ctx.fill();
+  ctx.fillStyle = '#e0e0e0'; ctx.font = 'bold 14px "Microsoft YaHei","PingFang SC",sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.fillText('¥'+total.toFixed(0), cx, cy);
+
+  legend.innerHTML = segs.map(s => {
+    const pct = total > 0 ? Math.round((s.value/total)*100) : 0;
+    return '<span class="legend-item"><span class="legend-dot" style="background:'+s.color+'"></span>'+s.label+' '+pct+'%</span>';
+  }).join('');
+}
+
 function renderMonthlySummary() {
   const months = {};
   expenses.forEach(e => {
@@ -975,6 +1027,8 @@ function renderMonthlySummary() {
   const now = new Date();
   const curKey = now.getFullYear() + '-' + fmt(now.getMonth() + 1);
 
+  if (!selectedMonth || !months[selectedMonth]) selectedMonth = curKey;
+
   // 当前月总计
   const curTotal = months[curKey] || 0;
   $('currentMonthTotal').textContent = '¥' + curTotal.toFixed(2);
@@ -983,9 +1037,22 @@ function renderMonthlySummary() {
   $('monthList').innerHTML = monthKeys.map(k => {
     const [y, m] = k.split('-');
     const label = y.slice(2) + '年' + m + '月';
-    const active = k === curKey ? ' active' : '';
-    return `<span class="month-tag${active}" data-month="${k}">${label} <span class="m-amount">¥${months[k].toFixed(0)}</span></span>`;
+    const active = k === selectedMonth ? ' active' : '';
+    return '<span class="month-tag'+active+'" data-month="'+k+'">'+label+' <span class="m-amount">¥'+months[k].toFixed(0)+'</span></span>';
   }).join('');
+
+  // 点击月份标签切换饼图
+  $('monthList').querySelectorAll('.month-tag').forEach(tag => {
+    tag.addEventListener('click', function() {
+      selectedMonth = this.dataset.month;
+      drawMonthlyPie(selectedMonth);
+      // 更新选中态
+      $('monthList').querySelectorAll('.month-tag').forEach(t => t.classList.remove('active'));
+      this.classList.add('active');
+    });
+  });
+
+  drawMonthlyPie(selectedMonth);
 }
 
 async function refreshAll() {
