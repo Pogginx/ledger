@@ -742,22 +742,19 @@ function renderSubSuggestions(cat) {
   });
 }
 
-// 子分类只允许中文（keydown 拦截，不影响退格和方向键）
-subInput.addEventListener('keydown', (e) => {
-  if (e.isComposing || e.ctrlKey || e.metaKey || e.altKey) return;
-  if (e.key === 'Backspace' || e.key === 'Delete' ||
-      e.key.startsWith('Arrow') || e.key === 'Tab' ||
-      e.key === 'Home' || e.key === 'End' || e.key === 'Enter') return;
-  if (e.key.length === 1 && !/^[一-鿿]$/.test(e.key)) {
-    e.preventDefault();
+// 子分类只允许中文（保留光标位置，退格不会弹到末尾）
+subInput.addEventListener('input', (e) => {
+  if (e.isComposing) return; // IME 输入中不拦截
+  const start = subInput.selectionStart;
+  const old = subInput.value;
+  const filtered = old.replace(/[^一-鿿]/g, '');
+  if (filtered !== old) {
+    subInput.value = filtered;
+    // 光标保持原位（减去被过滤掉的字符数）
+    const removed = old.length - filtered.length;
+    const pos = Math.max(0, start - removed);
+    subInput.setSelectionRange(pos, pos);
   }
-});
-
-// 防止粘贴非中文
-subInput.addEventListener('paste', (e) => {
-  e.preventDefault();
-  const text = (e.clipboardData || window.clipboardData).getData('text');
-  subInput.value = text.replace(/[^一-鿿]/g, '');
 });
 
 async function addExpense() {
