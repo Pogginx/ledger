@@ -742,18 +742,12 @@ function renderSubSuggestions(cat) {
   });
 }
 
-// 子分类只允许中文（保留光标位置，退格不会弹到末尾）
-subInput.addEventListener('input', (e) => {
-  if (e.isComposing) return; // IME 输入中不拦截
-  const start = subInput.selectionStart;
-  const old = subInput.value;
-  const filtered = old.replace(/[^一-鿿]/g, '');
-  if (filtered !== old) {
-    subInput.value = filtered;
-    // 光标保持原位（减去被过滤掉的字符数）
-    const removed = old.length - filtered.length;
-    const pos = Math.max(0, start - removed);
-    subInput.setSelectionRange(pos, pos);
+// 子分类只允许中文（beforeinput 在字符进入前拦截，零副作用）
+subInput.addEventListener('beforeinput', (e) => {
+  if (e.isComposing) return;          // IME 输入中放行
+  if (!e.data) return;               // 退格/删除放行
+  if (/[^一-鿿]/.test(e.data)) {      // 含非中文字符则拦截
+    e.preventDefault();
   }
 });
 
