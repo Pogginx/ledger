@@ -467,6 +467,13 @@ async function loadSubs() {
 }
 
 async function saveSub(cat, subName) {
+  // 先更新内存缓存（即时生效）
+  if (!customSubsCache[cat]) customSubsCache[cat] = [];
+  if (!customSubsCache[cat].includes(subName)) {
+    customSubsCache[cat].push(subName);
+    updateSubDatalist(cat);
+  }
+  // 再异步写入 Supabase
   const { data: exist } = await sb.from('ledger_subs')
     .select('*').eq('device_id', deviceId).eq('category', cat).eq('sub_name', subName);
   if (!exist || exist.length === 0) {
@@ -475,6 +482,12 @@ async function saveSub(cat, subName) {
     });
     if (error) console.error('保存子分类失败:', error);
   }
+}
+
+function updateSubDatalist(cat) {
+  if (catSel.value !== cat) return;
+  const subs = getAllSubs(cat);
+  subDatalist.innerHTML = subs.map(s => '<option value="' + escHtml(s) + '">').join('');
 }
 
 function getAllSubs(cat) { return customSubsCache[cat] || []; }
@@ -700,9 +713,8 @@ function updateSubUI() {
   if (!cat) { subInput.style.display='none'; return; }
   subInput.style.display='inline-block';
   subInput.placeholder = '输入子分类';
-  subInput.removeAttribute('list');
-  subInput.name = 'sub_' + Date.now();
-  subInput.value = '';
+  subInput.setAttribute('list', 'subDatalist');
+  updateSubDatalist(cat);
 }
 catSel.addEventListener('change', updateSubUI);
 subInput.addEventListener('input', () => {
@@ -725,6 +737,7 @@ async function addExpense() {
 
   expenses.unshift(exp);
   await addExpenseToCloud(exp);
+  await saveSub(cat, sub);
 
   amountInput.value=''; noteInput.value=''; subInput.value='';
   render(); renderMonthlySummary(); renderTrend(); renderExpenseList();
