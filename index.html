@@ -1077,9 +1077,9 @@ function renderMonthlySummary() {
 
   if (!selectedMonth || !months[selectedMonth]) selectedMonth = curKey;
 
-  // 当前月总计
-  const curTotal = months[curKey] || 0;
-  $('currentMonthTotal').textContent = '¥' + curTotal.toFixed(2);
+  // 选中月总计
+  const selTotal = months[selectedMonth] || 0;
+  $('currentMonthTotal').textContent = '¥' + selTotal.toFixed(2);
 
   // 月份标签
   $('monthList').innerHTML = monthKeys.map(k => {
