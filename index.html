@@ -717,9 +717,6 @@ function updateSubUI() {
   updateSubDatalist(cat);
 }
 catSel.addEventListener('change', updateSubUI);
-subInput.addEventListener('input', () => {
-  subInput.value = subInput.value.replace(/[^一-鿿]/g, '');
-});
 
 async function addExpense() {
   const cat = catSel.value;
