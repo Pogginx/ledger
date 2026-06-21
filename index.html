@@ -1003,11 +1003,23 @@ function drawMonthlyPie(monthKey) {
     ctx.beginPath(); ctx.moveTo(cx,cy); ctx.arc(cx,cy,R,angle,angle+sa); ctx.closePath();
     ctx.fillStyle = seg.color; ctx.fill();
     ctx.strokeStyle = 'rgba(20,20,40,0.5)'; ctx.lineWidth = 1.5; ctx.stroke();
-    angle += sa;
+    seg._sa = angle; seg._ea = angle + sa; angle += sa;
+  });
+  // 饼图标签
+  segs.forEach(seg => {
+    const pct = seg.value/total;
+    if (pct < 0.08) return;
+    const ma = (seg._sa + seg._ea)/2;
+    ctx.fillStyle = '#fff'; ctx.font = 'bold 10px "Microsoft YaHei","PingFang SC",sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.shadowColor = 'rgba(0,0,0,0.6)'; ctx.shadowBlur = 2;
+    ctx.fillText(seg.label, cx + Math.cos(ma)*R*0.65, cy + Math.sin(ma)*R*0.65);
+    ctx.shadowBlur = 0;
+    ctx.fillStyle = 'rgba(255,255,255,0.7)'; ctx.font = '9px "Microsoft YaHei","PingFang SC",sans-serif';
+    ctx.fillText(Math.round(pct*100)+'%', cx + Math.cos(ma)*R*0.65, cy + Math.sin(ma)*R*0.65 + 13);
   });
   ctx.beginPath(); ctx.arc(cx,cy,innerR,0,Math.PI*2); ctx.fillStyle = 'rgba(20,20,40,0.9)'; ctx.fill();
   ctx.fillStyle = '#e0e0e0'; ctx.font = 'bold 14px "Microsoft YaHei","PingFang SC",sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-  ctx.fillText('¥'+total.toFixed(0), cx, cy);
+  ctx.fillText('¥'+total.toFixed(2), cx, cy);
 
   legend.innerHTML = segs.map(s => {
     const pct = total > 0 ? Math.round((s.value/total)*100) : 0;
