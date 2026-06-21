@@ -1093,6 +1093,8 @@ function renderMonthlySummary() {
   $('monthList').querySelectorAll('.month-tag').forEach(tag => {
     tag.addEventListener('click', function() {
       selectedMonth = this.dataset.month;
+      var selTotal = months[selectedMonth] || 0;
+      $('currentMonthTotal').textContent = '¥' + selTotal.toFixed(2);
       drawMonthlyPie(selectedMonth);
       // 更新选中态
       $('monthList').querySelectorAll('.month-tag').forEach(t => t.classList.remove('active'));
