@@ -742,9 +742,22 @@ function renderSubSuggestions(cat) {
   });
 }
 
-// 子分类只允许中文
-subInput.addEventListener('input', () => {
-  subInput.value = subInput.value.replace(/[^一-鿿]/g, '');
+// 子分类只允许中文（keydown 拦截，不影响退格和方向键）
+subInput.addEventListener('keydown', (e) => {
+  if (e.isComposing || e.ctrlKey || e.metaKey || e.altKey) return;
+  if (e.key === 'Backspace' || e.key === 'Delete' ||
+      e.key.startsWith('Arrow') || e.key === 'Tab' ||
+      e.key === 'Home' || e.key === 'End' || e.key === 'Enter') return;
+  if (e.key.length === 1 && !/^[一-鿿]$/.test(e.key)) {
+    e.preventDefault();
+  }
+});
+
+// 防止粘贴非中文
+subInput.addEventListener('paste', (e) => {
+  e.preventDefault();
+  const text = (e.clipboardData || window.clipboardData).getData('text');
+  subInput.value = text.replace(/[^一-鿿]/g, '');
 });
 
 async function addExpense() {
