@@ -742,13 +742,16 @@ function renderSubSuggestions(cat) {
   });
 }
 
-// 子分类只允许中文（beforeinput 在字符进入前拦截，零副作用）
-subInput.addEventListener('beforeinput', (e) => {
-  if (e.isComposing) return;          // IME 输入中放行
-  if (!e.data) return;               // 退格/删除放行
-  if (/[^一-鿿]/.test(e.data)) {      // 含非中文字符则拦截
-    e.preventDefault();
-  }
+// 子分类只允许中文（双保险：beforeinput + input 兜底）
+var CJK = /[^一-鿿]/g;
+subInput.addEventListener('beforeinput', function(e) {
+  if (e.isComposing || !e.data) return;
+  if (CJK.test(e.data)) e.preventDefault();
+});
+subInput.addEventListener('input', function() {
+  var v = subInput.value;
+  var f = v.replace(CJK, '');
+  if (f !== v) subInput.value = f;
 });
 
 async function addExpense() {
