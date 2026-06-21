@@ -699,16 +699,17 @@ function updateSubUI() {
 }
 catSel.addEventListener('change', updateSubUI);
 
-// 子分类只允许中文（双保险：beforeinput + input 兜底）
-var CJK = /[^一-鿿]/g;
-subInput.addEventListener('beforeinput', function(e) {
-  if (e.isComposing || !e.data) return;
-  if (CJK.test(e.data)) e.preventDefault();
+// 子分类只允许中文
+var cjkLock = false;
+subInput.addEventListener('compositionstart', function(){ cjkLock = true; });
+subInput.addEventListener('compositionend', function(e){
+  cjkLock = false;
+  // IME 上屏后立刻过滤
+  subInput.value = subInput.value.replace(/[^一-鿿]/g, '');
 });
-subInput.addEventListener('input', function() {
-  var v = subInput.value;
-  var f = v.replace(CJK, '');
-  if (f !== v) subInput.value = f;
+subInput.addEventListener('input', function(){
+  if (cjkLock) return;  // IME 拼写中不拦截
+  subInput.value = subInput.value.replace(/[^一-鿿]/g, '');
 });
 
 async function addExpense() {
