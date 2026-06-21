@@ -368,6 +368,7 @@ canvas { display: block; margin: 0 auto; cursor: pointer; border-radius: 12px; }
         <option value="食">食</option>
         <option value="零食">零食</option>
         <option value="网购">网购</option>
+        <option value="生活">生活</option>
       </select>
       <input type="text" id="subInput" class="note-input" placeholder="输入或选择子分类" style="display:none;" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
       <input type="number" id="amountInput" class="amount-input" placeholder="金额" step="0.01" min="0.01">
@@ -413,7 +414,8 @@ const CAT_CFG = {
   '出行': { color: '#64b5f6' },
   '食':   { color: '#ffb74d' },
   '零食': { color: '#f06292' },
-  '网购': { color: '#4db6ac' }
+  '网购': { color: '#4db6ac' },
+  '生活': { color: '#81c784' }
 };
 const CATS = Object.keys(CAT_CFG);
 
